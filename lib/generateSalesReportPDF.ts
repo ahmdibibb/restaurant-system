@@ -241,7 +241,7 @@ export function generateSalesReportPDF(data: SalesReportData) {
       doc.text(productName, margin + 15, yPos + 5)
       
       doc.text(
-        `${item.quantitySold.toLocaleString('id-ID')} unit`,
+        `${item.quantitySold.toLocaleString('id-ID')} pcs`,
         pageWidth - margin - 50,
         yPos + 5,
         { align: 'right' }

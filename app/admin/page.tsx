@@ -548,7 +548,7 @@ export default function AdminDashboard() {
                               {item.productName}
                             </td>
                             <td className="whitespace-nowrap px-4 py-4 text-right text-sm text-gray-600">
-                              {item.quantitySold.toLocaleString("id-ID")} unit
+                              {item.quantitySold.toLocaleString("id-ID")} pcs
                             </td>
                             <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-semibold text-gray-900">
                               Rp {item.totalRevenue.toLocaleString("id-ID")}
