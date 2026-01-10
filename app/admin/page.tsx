@@ -83,10 +83,37 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    fetchStats();
-    fetchProducts();
-    fetchSalesReport();
+    checkUserRole();
   }, []);
+
+  const checkUserRole = async () => {
+    try {
+      const res = await fetch("/api/auth/me", {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        router.push("/login");
+        return;
+      }
+
+      const data = await res.json();
+      if (data.user?.role !== "ADMIN") {
+        setError(
+          "Access denied. You must be logged in as an administrator to access this page. Please log out and log in with admin credentials (admin@resto.com / admin123)."
+        );
+        return;
+      }
+
+      // User is admin, fetch data
+      fetchStats();
+      fetchProducts();
+      fetchSalesReport();
+    } catch (error) {
+      console.error("Error checking user role:", error);
+      router.push("/login");
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -109,7 +136,13 @@ export default function AdminDashboard() {
 
         if (res.status === 403) {
           console.error("Forbidden - Admin access required");
-          setError("Access denied. Admin privileges required.");
+          setError(
+            "Access denied. Admin privileges required. Please log out and log in with admin credentials (admin@resto.com / admin123)."
+          );
+          // Redirect to login after showing error
+          setTimeout(() => {
+            router.push("/login");
+          }, 3000);
         } else {
           setError(
             `Failed to load stats: ${errorData.error || "Unknown error"}`
@@ -175,6 +208,11 @@ export default function AdminDashboard() {
 
       if (!res.ok) {
         console.error("Failed to fetch sales report:", res.status);
+        if (res.status === 403) {
+          setError(
+            "Access denied. Admin privileges required. Please log out and log in with admin credentials (admin@resto.com / admin123)."
+          );
+        }
         setSalesReport(null);
         return;
       }
@@ -259,8 +297,11 @@ export default function AdminDashboard() {
 
       <div className="mx-auto max-w-7xl px-4 py-8">
         {error && (
-          <div className="mb-4 rounded-lg bg-yellow-50 border border-yellow-200 p-4">
-            <p className="text-sm text-yellow-800">⚠️ {error}</p>
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-4">
+            <p className="text-sm text-red-800 font-semibold">⚠️ {error}</p>
+            <p className="text-xs text-red-600 mt-2">
+              Admin credentials: admin@resto.com / admin123
+            </p>
           </div>
         )}
         {stats && (
