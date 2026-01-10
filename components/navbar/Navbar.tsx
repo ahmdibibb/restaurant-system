@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, Clock, MapPin, ShoppingCart } from 'lucide-react'
+import { LogOut, MapPin, ShoppingCart } from 'lucide-react'
 
 interface CartItem {
   productId: string
@@ -27,50 +27,9 @@ export default function Navbar({
 }: NavbarProps) {
   const router = useRouter()
   
-  // Initialize with current time immediately
-  const getFormattedTime = () => {
-    const now = new Date()
-    const timeString = now.toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    })
-    const dateString = now.toLocaleDateString('id-ID', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-    return `${dateString} - ${timeString}`
-  }
-  
-  const [currentTime, setCurrentTime] = useState<string>(getFormattedTime())
   const [location, setLocation] = useState<string>('Mendapatkan lokasi...')
 
   useEffect(() => {
-    // Update time every second
-    const updateTime = () => {
-      const now = new Date()
-      const timeString = now.toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-      })
-      const dateString = now.toLocaleDateString('id-ID', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-      setCurrentTime(`${dateString} - ${timeString}`)
-    }
-
-    // Set initial time immediately
-    updateTime()
-    const timeInterval = setInterval(updateTime, 1000)
-
     // Get location
     const getLocation = async () => {
       try {
@@ -141,10 +100,6 @@ export default function Navbar({
     }
 
     getLocation()
-
-    return () => {
-      clearInterval(timeInterval)
-    }
   }, [])
 
   const handleLogout = async () => {
@@ -162,14 +117,6 @@ export default function Navbar({
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <h1 className="text-2xl font-bold text-orange-600">{title}</h1>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-            {/* Realtime Clock */}
-            <div className="flex items-center gap-2 text-xs md:text-sm text-gray-700">
-              <Clock size={18} className="text-orange-600 flex-shrink-0" />
-              <span className="font-medium break-words min-w-0">
-                {currentTime || 'Memuat waktu...'}
-              </span>
-            </div>
-
             {/* Location */}
             <div className="flex items-center gap-2 text-xs md:text-sm text-gray-700">
               <MapPin size={18} className="text-orange-600 flex-shrink-0" />

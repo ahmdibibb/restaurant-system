@@ -41,10 +41,27 @@ export default function KitchenPage() {
   const fetchOrders = async () => {
     try {
       const res = await fetch('/api/kitchen/orders')
+      
+      if (!res.ok) {
+        // If response is not ok, set empty array
+        setOrders([])
+        if (res.status === 401 || res.status === 403) {
+          router.push('/login')
+        }
+        return
+      }
+      
       const data = await res.json()
-      setOrders(data)
+      // Ensure data is an array
+      if (Array.isArray(data)) {
+        setOrders(data)
+      } else {
+        console.error('Invalid data format:', data)
+        setOrders([])
+      }
     } catch (error) {
       console.error('Error fetching orders:', error)
+      setOrders([])
     } finally {
       setLoading(false)
     }
