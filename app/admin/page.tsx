@@ -1,157 +1,181 @@
-"use client";
+'use client'
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
+  LayoutDashboard,
   Package,
-  DollarSign,
   ShoppingCart,
-  TrendingDown,
+  Users as UsersIcon,
+  TrendingUp,
+  Menu,
+  Bell,
+  Moon,
+  User,
+  Settings,
+  FileText,
+  LogOut,
   Plus,
   Edit,
   Trash2,
-  FileText,
-  CreditCard,
-  Wallet,
-  QrCode,
   Download,
-} from "lucide-react";
-import Navbar from "@/components/navbar/Navbar";
-import Loading from "@/components/Loading";
-import { generateSalesReportPDF } from "@/lib/generateSalesReportPDF";
+  DollarSign,
+} from 'lucide-react'
+import Loading from '@/components/Loading'
+import UserManagement from '@/components/admin/UserManagement'
+import OrderList from '@/components/admin/OrderList'
+import Analytics from '@/components/admin/Analytics'
+import OrderDetailModal from '@/components/admin/OrderDetailModal'
+import { generateSalesReportPDF } from '@/lib/generateSalesReportPDF'
 
 interface DashboardStats {
-  totalSales: number;
-  totalOrders: number;
-  productsSold: number;
-  lowStockProducts: Array<{ id: string; name: string; stock: number }>;
-  topProducts: Array<{ product: any; quantitySold: number }>;
-  dailySales: Array<{ date: string; amount: number }>;
+  totalSales: number
+  totalOrders: number
+  productsSold: number
+  lowStockProducts: Array<{ id: string; name: string; stock: number }>
+  topProducts: Array<{ product: any; quantitySold: number }>
+  dailySales: Array<{ date: string; amount: number }>
 }
 
 interface Product {
-  id: string;
-  name: string;
-  description: string | null;
-  price: number;
-  stock: number;
-  isActive: boolean;
-  category: string | null;
-  image: string | null;
+  id: string
+  name: string
+  description: string | null
+  price: number
+  stock: number
+  isActive: boolean
+  category: string | null
+  image: string | null
 }
 
 interface SalesReport {
   period: {
-    startDate: string;
-    endDate: string;
-    days: number;
-  };
-  totalProductsSold: number;
-  totalRevenue: number;
+    startDate: string
+    endDate: string
+    days: number
+  }
+  totalProductsSold: number
+  totalRevenue: number
   revenueByMethod: {
-    CASH: number;
-    QRIS: number;
-    EDC: number;
-  };
+    CASH: number
+    QRIS: number
+    EDC: number
+  }
   productSales: Array<{
-    productId: string;
-    productName: string;
-    quantitySold: number;
-    totalRevenue: number;
-  }>;
-  dailyRevenue: Array<{ date: string; amount: number }>;
+    productId: string
+    productName: string
+    quantitySold: number
+    totalRevenue: number
+  }>
+  dailyRevenue: Array<{ date: string; amount: number }>
 }
 
+type Tab = 'dashboard' | 'products' | 'orders' | 'users' | 'analytics'
+
 export default function AdminDashboard() {
-  const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [salesReport, setSalesReport] = useState<SalesReport | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showProductForm, setShowProductForm] = useState(false);
-  const [showSalesReport, setShowSalesReport] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [salesReport, setSalesReport] = useState<SalesReport | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showProductForm, setShowProductForm] = useState(false)
+  const [showSalesReport, setShowSalesReport] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [todayOrders, setTodayOrders] = useState(0)
+  const [todayRevenue, setTodayRevenue] = useState(0)
+  const [recentOrders, setRecentOrders] = useState<any[]>([])
+  const [revenuePeriod, setRevenuePeriod] = useState('monthly')
+  const [orderPeriod, setOrderPeriod] = useState('weekly')
+  const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    price: "",
-    stock: "",
-    image: "",
-    category: "",
-  });
+    name: '',
+    description: '',
+    price: '',
+    stock: '',
+    image: '',
+    category: '',
+  })
 
   useEffect(() => {
-    checkUserRole();
-  }, []);
+    checkUserRole()
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      fetchTodayStats()
+      fetchRecentOrders()
+    }
+  }, [activeTab])
 
   const checkUserRole = async () => {
     try {
-      const res = await fetch("/api/auth/me", {
-        credentials: "include",
-      });
+      const res = await fetch('/api/auth/me', {
+        credentials: 'include',
+      })
 
       if (!res.ok) {
-        router.push("/login");
-        return;
+        router.push('/login')
+        return
       }
 
-      const data = await res.json();
-      if (data.user?.role !== "ADMIN") {
-        setError(
-          "Access denied. You must be logged in as an administrator to access this page. Please log out and log in with admin credentials (admin@resto.com / admin123)."
-        );
-        return;
+      const data = await res.json()
+      if (data.user?.role !== 'ADMIN') {
+        setError('Access denied. Admin privileges required.')
+        setLoading(false)
+        return
       }
 
-      // User is admin, fetch data in parallel for faster loading
-      await Promise.all([
-        fetchStats(),
-        fetchProducts(),
-      ]);
-      // Don't fetch sales report initially, only when user clicks
+      await Promise.all([fetchStats(), fetchProducts()])
+      setLoading(false)
     } catch (error) {
-      console.error("Error checking user role:", error);
-      router.push("/login");
+      console.error('Error checking user role:', error)
+      setLoading(false)
+      router.push('/login')
     }
-  };
+  }
+
+  const fetchTodayStats = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const res = await fetch(`/api/admin/orders?period=daily&date=${today}&limit=100`, {
+        credentials: 'include',
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setTodayOrders(data.stats?.totalOrders || 0)
+        setTodayRevenue(data.stats?.totalRevenue || 0)
+      }
+    } catch (error) {
+      console.error('Error fetching today stats:', error)
+    }
+  }
+
+  const fetchRecentOrders = async () => {
+    try {
+      const res = await fetch('/api/admin/orders?period=all&limit=5', {
+        credentials: 'include',
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setRecentOrders(data.orders || [])
+      }
+    } catch (error) {
+      console.error('Error fetching recent orders:', error)
+    }
+  }
 
   const fetchStats = async () => {
     try {
-      const res = await fetch("/api/dashboard/stats?period=month", {
-        credentials: "include", // Include cookies for authentication
-      });
+      const res = await fetch('/api/dashboard/stats?period=month', {
+        credentials: 'include',
+      })
 
       if (!res.ok) {
-        const errorData = await res
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
-        console.error("Failed to fetch stats:", res.status, errorData);
-
-        // Handle different error statuses
-        if (res.status === 401) {
-          console.error("Unauthorized - Please login again");
-          router.push("/login");
-          return;
-        }
-
-        if (res.status === 403) {
-          console.error("Forbidden - Admin access required");
-          setError(
-            "Access denied. Admin privileges required. Please log out and log in with admin credentials (admin@resto.com / admin123)."
-          );
-          // Redirect to login after showing error
-          setTimeout(() => {
-            router.push("/login");
-          }, 3000);
-        } else {
-          setError(
-            `Failed to load stats: ${errorData.error || "Unknown error"}`
-          );
-        }
-
-        // Set default stats on error but don't throw
         setStats({
           totalSales: 0,
           totalOrders: 0,
@@ -159,14 +183,11 @@ export default function AdminDashboard() {
           lowStockProducts: [],
           topProducts: [],
           dailySales: [],
-        });
-        return;
+        })
+        return
       }
 
-      const data = await res.json();
-      // Clear any previous errors
-      setError(null);
-      // Ensure all required fields have default values
+      const data = await res.json()
       setStats({
         totalSales: data.totalSales || 0,
         totalOrders: data.totalOrders || 0,
@@ -174,11 +195,9 @@ export default function AdminDashboard() {
         lowStockProducts: data.lowStockProducts || [],
         topProducts: data.topProducts || [],
         dailySales: data.dailySales || [],
-      });
-    } catch (error: any) {
-      console.error("Error fetching stats:", error);
-      setError("Network error. Please check your connection.");
-      // Set default stats on error
+      })
+    } catch (error) {
+      console.error('Error fetching stats:', error)
       setStats({
         totalSales: 0,
         totalOrders: 0,
@@ -186,389 +205,596 @@ export default function AdminDashboard() {
         lowStockProducts: [],
         topProducts: [],
         dailySales: [],
-      });
+      })
     }
-  };
+  }
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch("/api/products");
-      const data = await res.json();
-      setProducts(data);
+      const res = await fetch('/api/products')
+      const data = await res.json()
+      setProducts(data)
     } catch (error) {
-      console.error("Error fetching products:", error);
+      console.error('Error fetching products:', error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const fetchSalesReport = async () => {
     try {
-      const res = await fetch("/api/dashboard/sales-report", {
-        credentials: "include",
-      });
+      const res = await fetch('/api/dashboard/sales-report', {
+        credentials: 'include',
+      })
 
       if (!res.ok) {
-        console.error("Failed to fetch sales report:", res.status);
-        if (res.status === 403) {
-          setError(
-            "Access denied. Admin privileges required. Please log out and log in with admin credentials (admin@resto.com / admin123)."
-          );
-        }
-        setSalesReport(null);
-        return;
+        setSalesReport(null)
+        return
       }
 
-      const data = await res.json();
-      setSalesReport(data);
+      const data = await res.json()
+      setSalesReport(data)
     } catch (error) {
-      console.error("Error fetching sales report:", error);
-      setSalesReport(null);
+      console.error('Error fetching sales report:', error)
+      setSalesReport(null)
     }
-  };
+  }
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
       const url = editingProduct
         ? `/api/products/${editingProduct.id}`
-        : "/api/products";
-      const method = editingProduct ? "PUT" : "POST";
+        : '/api/products'
+      const method = editingProduct ? 'PUT' : 'POST'
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...formData,
           price: parseFloat(formData.price),
           stock: parseInt(formData.stock),
         }),
-      });
+      })
 
       if (res.ok) {
-        setShowProductForm(false);
-        setEditingProduct(null);
+        setShowProductForm(false)
+        setEditingProduct(null)
         setFormData({
-          name: "",
-          description: "",
-          price: "",
-          stock: "",
-          image: "",
-          category: "",
-        });
-        fetchProducts();
-        setError(null); // Clear any previous errors
+          name: '',
+          description: '',
+          price: '',
+          stock: '',
+          image: '',
+          category: '',
+        })
+        fetchProducts()
+        setError(null)
       } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to save product');
+        const data = await res.json()
+        setError(data.error || 'Failed to save product')
       }
     } catch (error) {
-      console.error("Error saving product:", error);
-      setError('Network error. Please try again.');
+      console.error('Error saving product:', error)
+      setError('Network error. Please try again.')
     }
-  };
+  }
 
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
+    setEditingProduct(product)
     setFormData({
       name: product.name,
-      description: product.description || "",
+      description: product.description || '',
       price: product.price.toString(),
       stock: product.stock.toString(),
-      image: product.image || "",
-      category: product.category || "",
-    });
-    setShowProductForm(true);
-  };
+      image: product.image || '',
+      category: product.category || '',
+    })
+    setShowProductForm(true)
+  }
 
   const handleDeleteProduct = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm('Are you sure you want to delete this product?')) return
 
     try {
-      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
       if (res.ok) {
-        fetchProducts();
+        fetchProducts()
       }
     } catch (error) {
-      console.error("Error deleting product:", error);
+      console.error('Error deleting product:', error)
     }
-  };
+  }
+
+  const navItems = [
+    { id: 'dashboard' as Tab, label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'products' as Tab, label: 'Products', icon: Package },
+    { id: 'orders' as Tab, label: 'Orders', icon: ShoppingCart },
+    { id: 'users' as Tab, label: 'Users', icon: UsersIcon },
+    { id: 'analytics' as Tab, label: 'Analytics', icon: TrendingUp },
+  ]
 
   if (loading) {
     return <Loading />
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar title="Admin Dashboard" />
-
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        {error && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-4">
-            <p className="text-sm text-red-800 font-semibold">⚠️ {error}</p>
-            <p className="text-xs text-red-600 mt-2">
-              Admin credentials: admin@resto.com / admin123
-            </p>
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 flex flex-col py-6 z-50">
+        {/* Logo */}
+        <div className="px-6 mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-600 rounded-xl flex items-center justify-center">
+              <span className="text-xl"></span>
+            </div>
+            <span className="text-xl font-bold text-gray-900">Resto Iga Bakar</span>
           </div>
-        )}
-        {stats && (
-          <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="rounded-lg bg-white p-6 shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Sales</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    Rp {(stats.totalSales || 0).toLocaleString("id-ID")}
-                  </p>
-                </div>
-                <DollarSign size={32} className="text-orange-600" />
-              </div>
-            </div>
+        </div>
 
-            <div className="rounded-lg bg-white p-6 shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Orders</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {stats.totalOrders || 0}
-                  </p>
-                </div>
-                <ShoppingCart size={32} className="text-blue-600" />
-              </div>
-            </div>
-
-            <div className="rounded-lg bg-white p-6 shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Products Sold</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {stats.productsSold || 0}
-                  </p>
-                </div>
-                <Package size={32} className="text-green-600" />
-              </div>
-            </div>
-
-            <div className="rounded-lg bg-white p-6 shadow-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Low Stock Items</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {stats.lowStockProducts?.length || 0}
-                  </p>
-                </div>
-                <TrendingDown size={32} className="text-red-600" />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Sales Report Section */}
-        <div className="mb-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Laporan Penjualan</h2>
-            <div className="flex gap-2">
-              {showSalesReport && salesReport && (
+        {/* Navigation */}
+        <nav className="flex-1 px-4">
+          <div className="space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
                 <button
-                  onClick={() => {
-                    generateSalesReportPDF(salesReport);
-                  }}
-                  className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 transition-all hover:scale-105 active:scale-95"
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
+                    ? 'bg-orange-50 text-orange-600 font-medium'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
                 >
-                  <Download size={20} />
-                  Download PDF
+                  <Icon size={20} />
+                  <span className="text-sm">{item.label}</span>
                 </button>
-              )}
-              <button
-                onClick={() => {
-                  setShowSalesReport(!showSalesReport);
-                  if (!showSalesReport && !salesReport) {
-                    fetchSalesReport();
-                  }
-                }}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-all hover:scale-105 active:scale-95"
-              >
-                <FileText size={20} />
-                {showSalesReport ? "Sembunyikan Laporan" : "Tampilkan Laporan"}
+              )
+            })}
+          </div>
+        </nav>
+
+        {/* Settings & Logout */}
+        <div className="px-4 space-y-1 border-t border-gray-200 pt-4">
+          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all">
+            <Settings size={20} />
+            <span className="text-sm">Settings</span>
+          </button>
+          <button
+            onClick={() => {
+              document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+              router.push('/login')
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all"
+          >
+            <LogOut size={20} />
+            <span className="text-sm">Sign Out</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 ml-64">
+        {/* Top Bar */}
+        <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl font-bold text-gray-900">
+                {navItems.find((item) => item.id === activeTab)?.label || 'Dashboard'}
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <button className="p-2 rounded-lg hover:bg-gray-100">
+                <Moon size={20} className="text-gray-600" />
               </button>
+              <button className="p-2 rounded-lg hover:bg-gray-100 relative">
+                <Bell size={20} className="text-gray-600" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+              <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
+                <span className="text-sm font-medium text-gray-700">Admin</span>
+                <div className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center">
+                  <User size={20} className="text-white" />
+                </div>
+              </div>
             </div>
           </div>
+        </div>
 
-          {showSalesReport && salesReport && (
+        {/* Content Area */}
+        <div className="p-8">
+          {error && (
+            <div className="mb-6 rounded-xl bg-red-50 border border-red-200 p-4">
+              <p className="text-sm text-red-800 font-semibold">⚠️ {error}</p>
+            </div>
+          )}
+
+          {/* Dashboard Tab */}
+          {activeTab === 'dashboard' && stats && (
             <div className="space-y-6">
-              {/* Period Info */}
-              <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
-                <p className="text-sm text-blue-800">
-                  <span className="font-semibold">Periode:</span>{" "}
-                  {new Date(salesReport.period.startDate).toLocaleDateString(
-                    "id-ID",
-                    {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    }
-                  )}{" "}
-                  -{" "}
-                  {new Date(salesReport.period.endDate).toLocaleDateString(
-                    "id-ID",
-                    {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    }
-                  )}{" "}
-                  ({salesReport.period.days} hari terakhir)
-                </p>
-              </div>
-
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <div className="rounded-lg bg-white p-6 shadow-md border-l-4 border-green-500">
-                  <div className="flex items-center justify-between">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Total Menus */}
+                <div className="bg-gray-900 text-white rounded-2xl p-6">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <p className="text-sm text-gray-600">Total Produk Terjual</p>
-                      <p className="text-2xl font-bold text-green-600">
-                        {salesReport.totalProductsSold.toLocaleString("id-ID")}
-                      </p>
+                      <p className="text-4xl font-bold">{products.length}</p>
+                      <p className="text-sm text-gray-400 mt-1">Total Menus</p>
                     </div>
-                    <Package size={32} className="text-green-600" />
+                    <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center">
+                      <Package size={20} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">0</span>
+                      <span className="text-gray-400">{products.length}</span>
+                    </div>
+                    <div className="w-full bg-gray-800 rounded-full h-2">
+                      <div className="bg-white rounded-full h-2" style={{ width: '100%' }}></div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-white p-6 shadow-md border-l-4 border-orange-500">
-                  <div className="flex items-center justify-between">
+                {/* Total Orders Today */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <p className="text-sm text-gray-600">Total Pendapatan</p>
-                      <p className="text-2xl font-bold text-orange-600">
-                        Rp{" "}
-                        {salesReport.totalRevenue.toLocaleString("id-ID")}
-                      </p>
+                      <p className="text-4xl font-bold text-gray-900">{todayOrders}</p>
+                      <p className="text-sm text-gray-500 mt-1">Total Orders Today</p>
                     </div>
-                    <DollarSign size={32} className="text-orange-600" />
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <ShoppingCart size={20} className="text-purple-600" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">0</span>
+                      <span className="text-gray-400">{todayOrders}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-purple-400 rounded-full h-2"
+                        style={{ width: todayOrders > 0 ? `${Math.min((todayOrders / 20) * 100, 100)}%` : '0%' }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-white p-6 shadow-md border-l-4 border-blue-500">
-                  <div className="flex items-center justify-between">
+                {/* Total Products Sold */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <p className="text-sm text-gray-600">Cash</p>
-                      <p className="text-2xl font-bold text-blue-600">
-                        Rp{" "}
-                        {salesReport.revenueByMethod.CASH.toLocaleString(
-                          "id-ID"
-                        )}
-                      </p>
+                      <p className="text-4xl font-bold text-gray-900">{stats?.productsSold || 0}</p>
+                      <p className="text-sm text-gray-500 mt-1">Total Products Sold</p>
                     </div>
-                    <Wallet size={32} className="text-blue-600" />
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <Package size={20} className="text-gray-600" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">0</span>
+                      <span className="text-gray-400">{stats?.productsSold || 0}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-gray-300 rounded-full h-2"
+                        style={{ width: stats?.productsSold ? `${Math.min((stats.productsSold / 100) * 100, 100)}%` : '0%' }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-white p-6 shadow-md border-l-4 border-purple-500">
-                  <div className="flex items-center justify-between">
+                {/* Revenue Today */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <p className="text-sm text-gray-600">QRIS</p>
-                      <p className="text-2xl font-bold text-purple-600">
-                        Rp{" "}
-                        {salesReport.revenueByMethod.QRIS.toLocaleString(
-                          "id-ID"
-                        )}
+                      <p className="text-4xl font-bold text-gray-900">
+                        Rp {todayRevenue.toLocaleString('id-ID')}
                       </p>
+                      <p className="text-sm text-gray-500 mt-1">Revenue Today</p>
                     </div>
-                    <QrCode size={32} className="text-purple-600" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment Methods Breakdown */}
-              <div className="rounded-lg bg-white p-6 shadow-md">
-                <h3 className="mb-4 text-xl font-semibold">
-                  Pendapatan per Metode Pembayaran
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
-                    <div className="flex items-center gap-3">
-                      <Wallet size={24} className="text-blue-600" />
-                      <span className="font-medium">Cash</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900">
-                        Rp{" "}
-                        {salesReport.revenueByMethod.CASH.toLocaleString(
-                          "id-ID"
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {salesReport.totalRevenue > 0
-                          ? (
-                            (salesReport.revenueByMethod.CASH /
-                              salesReport.totalRevenue) *
-                            100
-                          ).toFixed(1)
-                          : 0}
-                        % dari total
-                      </p>
+                    <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                      <DollarSign size={20} className="text-pink-600" />
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
-                    <div className="flex items-center gap-3">
-                      <QrCode size={24} className="text-purple-600" />
-                      <span className="font-medium">QRIS</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Rp 0</span>
+                      <span className="text-gray-400">Rp {todayRevenue.toLocaleString('id-ID')}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900">
-                        Rp{" "}
-                        {salesReport.revenueByMethod.QRIS.toLocaleString(
-                          "id-ID"
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {salesReport.totalRevenue > 0
-                          ? (
-                            (salesReport.revenueByMethod.QRIS /
-                              salesReport.totalRevenue) *
-                            100
-                          ).toFixed(1)
-                          : 0}
-                        % dari total
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
-                    <div className="flex items-center gap-3">
-                      <CreditCard size={24} className="text-green-600" />
-                      <span className="font-medium">EDC</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900">
-                        Rp{" "}
-                        {salesReport.revenueByMethod.EDC.toLocaleString(
-                          "id-ID"
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {salesReport.totalRevenue > 0
-                          ? (
-                            (salesReport.revenueByMethod.EDC /
-                              salesReport.totalRevenue) *
-                            100
-                          ).toFixed(1)
-                          : 0}
-                        % dari total
-                      </p>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-pink-400 rounded-full h-2"
+                        style={{ width: todayRevenue > 0 ? `${Math.min((todayRevenue / 1000000) * 100, 100)}%` : '0%' }}
+                      ></div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Product Sales Breakdown */}
-              <div className="rounded-lg bg-white p-6 shadow-md">
-                <h3 className="mb-4 text-xl font-semibold">
-                  Detail Produk Terjual
-                </h3>
-                {salesReport.productSales.length > 0 ? (
+              {/* Charts Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Revenue Chart - Line Chart */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-gray-900">Revenue</h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setRevenuePeriod('monthly')}
+                        className={`px-4 py-1 text-sm rounded-lg ${revenuePeriod === 'monthly'
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        onClick={() => setRevenuePeriod('weekly')}
+                        className={`px-4 py-1 text-sm rounded-lg ${revenuePeriod === 'weekly'
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                      >
+                        Weekly
+                      </button>
+                      <button
+                        onClick={() => setRevenuePeriod('today')}
+                        className={`px-4 py-1 text-sm rounded-lg ${revenuePeriod === 'today'
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                      >
+                        Today
+                      </button>
+                    </div>
+                  </div>
+                  <div className="h-64 relative">
+                    {stats?.dailySales && stats.dailySales.length > 0 ? (
+                      <div className="h-full w-full relative">
+                        {/* Y-axis labels */}
+                        <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-gray-400">
+                          <span>Rp {Math.max(...stats.dailySales.map(d => d.amount)).toLocaleString('id-ID', { notation: 'compact' })}</span>
+                          <span>Rp {(Math.max(...stats.dailySales.map(d => d.amount)) / 2).toLocaleString('id-ID', { notation: 'compact' })}</span>
+                          <span>0</span>
+                        </div>
+
+                        {/* Chart area */}
+                        <div className="ml-12 h-full pb-8 relative">
+                          <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
+                            {/* Grid lines */}
+                            <line x1="0" y1="0" x2="400" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                            <line x1="0" y1="100" x2="400" y2="100" stroke="#e5e7eb" strokeWidth="1" />
+                            <line x1="0" y1="200" x2="400" y2="200" stroke="#e5e7eb" strokeWidth="1" />
+
+                            {/* Area fill */}
+                            <defs>
+                              <linearGradient id="revenueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+                                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+                              </linearGradient>
+                            </defs>
+
+                            {(() => {
+                              const dataCount = revenuePeriod === 'monthly' ? 30 : revenuePeriod === 'weekly' ? 7 : 1
+                              const data = stats.dailySales.slice(-dataCount)
+                              const maxAmount = Math.max(...data.map(d => d.amount), 1)
+                              const points = data.map((day, i) => {
+                                const x = data.length > 1 ? (i / (data.length - 1)) * 400 : 200
+                                const y = 200 - (day.amount / maxAmount) * 200
+                                return `${x},${y}`
+                              }).join(' ')
+
+                              const areaPoints = `0,200 ${points} 400,200`
+
+                              return (
+                                <>
+                                  <polyline
+                                    points={areaPoints}
+                                    fill="url(#revenueGradient)"
+                                  />
+                                  <polyline
+                                    points={points}
+                                    fill="none"
+                                    stroke="#3b82f6"
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                  {data.map((day, i) => {
+                                    const x = data.length > 1 ? (i / (data.length - 1)) * 400 : 200
+                                    const y = 200 - (day.amount / maxAmount) * 200
+                                    return (
+                                      <circle
+                                        key={i}
+                                        cx={x}
+                                        cy={y}
+                                        r="4"
+                                        fill="#3b82f6"
+                                        className="hover:r-6 transition-all cursor-pointer"
+                                      />
+                                    )
+                                  })}
+                                </>
+                              )
+                            })()}
+                          </svg>
+
+                          {/* X-axis labels */}
+                          <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-400">
+                            {(() => {
+                              const dataCount = revenuePeriod === 'monthly' ? 30 : revenuePeriod === 'weekly' ? 7 : 1
+                              const data = stats.dailySales.slice(-dataCount)
+                              return data.map((day, i) => (
+                                <span key={i}>
+                                  {revenuePeriod === 'today'
+                                    ? new Date(day.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                                    : new Date(day.date).getDate()
+                                  }
+                                </span>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-gray-400">
+                        No revenue data available
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Summary Chart - Line Chart */}
+                <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-gray-900">Order Summary</h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setOrderPeriod('monthly')}
+                        className={`px-4 py-1 text-sm rounded-lg ${orderPeriod === 'monthly'
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        onClick={() => setOrderPeriod('weekly')}
+                        className={`px-4 py-1 text-sm rounded-lg ${orderPeriod === 'weekly'
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                      >
+                        Weekly
+                      </button>
+                      <button
+                        onClick={() => setOrderPeriod('today')}
+                        className={`px-4 py-1 text-sm rounded-lg ${orderPeriod === 'today'
+                          ? 'bg-gray-900 text-white'
+                          : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                      >
+                        Today
+                      </button>
+                    </div>
+                  </div>
+                  <div className="h-64 relative">
+                    {stats?.dailySales && stats.dailySales.length > 0 ? (
+                      <div className="h-full w-full relative">
+                        {/* Y-axis labels */}
+                        <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-gray-400">
+                          <span>{Math.max(...stats.dailySales.map(d => d.amount))}</span>
+                          <span>{Math.round(Math.max(...stats.dailySales.map(d => d.amount)) / 2)}</span>
+                          <span>0</span>
+                        </div>
+
+                        {/* Chart area */}
+                        <div className="ml-12 h-full pb-8 relative">
+                          <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
+                            {/* Grid lines */}
+                            <line x1="0" y1="0" x2="400" y2="0" stroke="#e5e7eb" strokeWidth="1" />
+                            <line x1="0" y1="100" x2="400" y2="100" stroke="#e5e7eb" strokeWidth="1" />
+                            <line x1="0" y1="200" x2="400" y2="200" stroke="#e5e7eb" strokeWidth="1" />
+
+                            {/* Area fill */}
+                            <defs>
+                              <linearGradient id="orderGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
+                                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.05" />
+                              </linearGradient>
+                            </defs>
+
+                            {(() => {
+                              const dataCount = orderPeriod === 'monthly' ? 30 : orderPeriod === 'weekly' ? 7 : 1
+                              const data = stats.dailySales.slice(-dataCount)
+                              const maxAmount = Math.max(...data.map(d => d.amount), 1)
+                              const points = data.map((day, i) => {
+                                const x = data.length > 1 ? (i / (data.length - 1)) * 400 : 200
+                                const y = 200 - (day.amount / maxAmount) * 200
+                                return `${x},${y}`
+                              }).join(' ')
+
+                              const areaPoints = `0,200 ${points} 400,200`
+
+                              return (
+                                <>
+                                  <polyline
+                                    points={areaPoints}
+                                    fill="url(#orderGradient)"
+                                  />
+                                  <polyline
+                                    points={points}
+                                    fill="none"
+                                    stroke="#8b5cf6"
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                  {data.map((day, i) => {
+                                    const x = data.length > 1 ? (i / (data.length - 1)) * 400 : 200
+                                    const y = 200 - (day.amount / maxAmount) * 200
+                                    return (
+                                      <circle
+                                        key={i}
+                                        cx={x}
+                                        cy={y}
+                                        r="4"
+                                        fill="#8b5cf6"
+                                        className="hover:r-6 transition-all cursor-pointer"
+                                      />
+                                    )
+                                  })}
+                                </>
+                              )
+                            })()}
+                          </svg>
+
+                          {/* X-axis labels */}
+                          <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-400">
+                            {(() => {
+                              const dataCount = orderPeriod === 'monthly' ? 30 : orderPeriod === 'weekly' ? 7 : 1
+                              const data = stats.dailySales.slice(-dataCount)
+                              return data.map((day, i) => (
+                                <span key={i}>
+                                  {orderPeriod === 'today'
+                                    ? new Date(day.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                                    : orderPeriod === 'weekly'
+                                      ? new Date(day.date).toLocaleDateString('id-ID', { weekday: 'short' })
+                                      : new Date(day.date).getDate()
+                                  }
+                                </span>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-gray-400">
+                        No order data available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Order List Preview */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-gray-900">Recent Orders</h3>
+                  <button
+                    onClick={() => setActiveTab('orders')}
+                    className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                  >
+                    View All →
+                  </button>
+                </div>
+
+                {recentOrders.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-gray-50">
@@ -577,30 +803,71 @@ export default function AdminDashboard() {
                             No
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                            Nama Produk
+                            ID #
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                            Jumlah Terjual
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                            Date
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">
-                            Total Pendapatan
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                            Customer Name
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                            Type
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                            Amount
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                            Status Order
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {salesReport.productSales.map((item, index) => (
-                          <tr key={item.productId} className="hover:bg-gray-50">
+                        {recentOrders.map((order, index) => (
+                          <tr
+                            key={order.id}
+                            onClick={() => setSelectedOrder(order)}
+                            className="hover:bg-gray-50 cursor-pointer transition-colors"
+                          >
                             <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-600">
                               {index + 1}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-4 font-medium text-gray-900">
-                              {item.productName}
+                            <td className="whitespace-nowrap px-4 py-4 font-mono text-sm font-medium text-gray-900">
+                              #{order.orderNumber}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-4 text-right text-sm text-gray-600">
-                              {item.quantitySold.toLocaleString("id-ID")} pcs
+                            <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-600">
+                              {new Date(order.createdAt).toLocaleDateString('id-ID', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-4 text-right text-sm font-semibold text-gray-900">
-                              Rp {item.totalRevenue.toLocaleString("id-ID")}
+                            <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-900">
+                              {order.user?.name || 'N/A'}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-4 text-sm text-gray-600">
+                              {order.orderType === 'DINE_IN'
+                                ? `🍽️ Dine-In`
+                                : '🥡 Takeaway'}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-4 text-sm font-semibold text-gray-900">
+                              Rp {order.totalAmount.toLocaleString('id-ID')}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-4">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                                order.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
+                                  order.status === 'READY' ? 'bg-green-100 text-green-800' :
+                                    order.status === 'COMPLETED' ? 'bg-gray-100 text-gray-800' :
+                                      'bg-gray-100 text-gray-800'
+                                }`}>
+                                <span className={`w-2 h-2 rounded-full ${order.status === 'PENDING' ? 'bg-yellow-600' :
+                                  order.status === 'CONFIRMED' ? 'bg-blue-600' :
+                                    order.status === 'READY' ? 'bg-green-600' :
+                                      order.status === 'COMPLETED' ? 'bg-gray-600' :
+                                        'bg-gray-600'
+                                  }`}></span>
+                                {order.status}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -608,238 +875,244 @@ export default function AdminDashboard() {
                     </table>
                   </div>
                 ) : (
-                  <p className="text-center text-gray-500 py-8">
-                    Belum ada data penjualan produk
-                  </p>
+                  <div className="text-center py-12 text-gray-400">
+                    <ShoppingCart size={48} className="mx-auto mb-4 opacity-20" />
+                    <p>No recent orders</p>
+                  </div>
                 )}
               </div>
             </div>
           )}
 
-          {showSalesReport && !salesReport && (
-            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
-              <p className="text-sm text-yellow-800">
-                Memuat laporan penjualan...
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="mb-8 flex justify-between">
-          <h2 className="text-2xl font-bold">Products</h2>
-          <button
-            onClick={() => {
-              setEditingProduct(null);
-              setFormData({
-                name: "",
-                description: "",
-                price: "",
-                stock: "",
-                image: "",
-                category: "",
-              });
-              setShowProductForm(true);
-            }}
-            className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-white hover:bg-orange-700"
-          >
-            <Plus size={20} />
-            Add Product
-          </button>
-        </div>
-
-        {showProductForm && (
-          <div className="mb-8 rounded-lg bg-white p-6 shadow-md">
-            <h3 className="mb-4 text-xl font-semibold">
-              {editingProduct ? "Edit Product" : "Add New Product"}
-            </h3>
-            <form
-              onSubmit={handleSubmitProduct}
-              className="grid gap-4 md:grid-cols-2"
-            >
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Price
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, price: e.target.value })
-                  }
-                  required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Stock
-                </label>
-                <input
-                  type="number"
-                  value={formData.stock}
-                  onChange={(e) =>
-                    setFormData({ ...formData, stock: e.target.value })
-                  }
-                  required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Category
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                >
-                  <option value="">Pilih Kategori</option>
-                  <option value="MAKANAN">Makanan</option>
-                  <option value="MINUMAN">Minuman</option>
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  rows={3}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Image URL
-                </label>
-                <input
-                  type="url"
-                  value={formData.image}
-                  onChange={(e) =>
-                    setFormData({ ...formData, image: e.target.value })
-                  }
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                />
-              </div>
-              <div className="md:col-span-2 flex gap-2">
+          {/* Products Tab */}
+          {activeTab === 'products' && (
+            <div>
+              <div className="mb-6 flex justify-between">
+                <h2 className="text-2xl font-bold">Products Management</h2>
                 <button
-                  type="submit"
-                  className="rounded-lg bg-orange-600 px-4 py-2 text-white hover:bg-orange-700"
-                >
-                  {editingProduct ? "Update" : "Create"}
-                </button>
-                <button
-                  type="button"
                   onClick={() => {
-                    setShowProductForm(false);
-                    setEditingProduct(null);
+                    setEditingProduct(null)
+                    setFormData({
+                      name: '',
+                      description: '',
+                      price: '',
+                      stock: '',
+                      image: '',
+                      category: '',
+                    })
+                    setShowProductForm(true)
                   }}
-                  className="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
+                  className="flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-white hover:bg-orange-700"
                 >
-                  Cancel
+                  <Plus size={20} />
+                  Add Product
                 </button>
               </div>
-            </form>
-          </div>
-        )}
 
-        <div className="overflow-x-auto rounded-lg bg-white shadow-md">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Stock
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {products.map((product) => (
-                <tr key={product.id}>
-                  <td className="whitespace-nowrap px-6 py-4 font-medium">
-                    {product.name}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    {product.category ? (
-                      <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800">
-                        {product.category}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">-</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    Rp {(product.price || 0).toLocaleString("id-ID")}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    {product.stock}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs ${product.isActive
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                        }`}
-                    >
-                      {product.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEditProduct(product)}
-                        className="rounded-lg border border-gray-300 p-2 transition-all hover:bg-gray-50 hover:scale-110 active:scale-95"
+              {showProductForm && (
+                <div className="mb-6 rounded-2xl bg-white p-6 border border-gray-200">
+                  <h3 className="mb-4 text-xl font-semibold">
+                    {editingProduct ? 'Edit Product' : 'Add New Product'}
+                  </h3>
+                  <form
+                    onSubmit={handleSubmitProduct}
+                    className="grid gap-4 md:grid-cols-2"
+                  >
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        required
+                        className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Price
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.price}
+                        onChange={(e) =>
+                          setFormData({ ...formData, price: e.target.value })
+                        }
+                        required
+                        className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Stock
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.stock}
+                        onChange={(e) =>
+                          setFormData({ ...formData, stock: e.target.value })
+                        }
+                        required
+                        className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={formData.category}
+                        onChange={(e) =>
+                          setFormData({ ...formData, category: e.target.value })
+                        }
+                        className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-orange-500 focus:outline-none"
                       >
-                        <Edit size={16} />
+                        <option value="">Pilih Kategori</option>
+                        <option value="MAKANAN">Makanan</option>
+                        <option value="MINUMAN">Minuman</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        value={formData.description}
+                        onChange={(e) =>
+                          setFormData({ ...formData, description: e.target.value })
+                        }
+                        className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-orange-500 focus:outline-none"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Image URL
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.image}
+                        onChange={(e) =>
+                          setFormData({ ...formData, image: e.target.value })
+                        }
+                        className="w-full rounded-xl border border-gray-300 px-4 py-2 focus:border-orange-500 focus:outline-none"
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex gap-2">
+                      <button
+                        type="submit"
+                        className="rounded-xl bg-orange-600 px-6 py-2 text-white hover:bg-orange-700"
+                      >
+                        {editingProduct ? 'Update' : 'Create'}
                       </button>
                       <button
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="rounded-lg border border-red-300 p-2 text-red-600 transition-all hover:bg-red-50 hover:scale-110 active:scale-95"
+                        type="button"
+                        onClick={() => {
+                          setShowProductForm(false)
+                          setEditingProduct(null)
+                        }}
+                        className="rounded-xl border border-gray-300 px-6 py-2 hover:bg-gray-50"
                       >
-                        <Trash2 size={16} />
+                        Cancel
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </form>
+                </div>
+              )}
+
+              <div className="overflow-x-auto rounded-2xl bg-white border border-gray-200">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                        Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                        Category
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                        Price
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                        Stock
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {products.map((product) => (
+                      <tr key={product.id} className="hover:bg-gray-50">
+                        <td className="whitespace-nowrap px-6 py-4 font-medium">
+                          {product.name}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          {product.category ? (
+                            <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800">
+                              {product.category}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          Rp {(product.price || 0).toLocaleString('id-ID')}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">{product.stock}</td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${product.isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                              }`}
+                          >
+                            {product.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEditProduct(product)}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <Edit size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteProduct(product.id)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'orders' && <OrderList />}
+          {activeTab === 'users' && <UserManagement />}
+          {activeTab === 'analytics' && <Analytics />}
         </div>
       </div>
+
+      {/* Order Detail Modal */}
+      <OrderDetailModal
+        order={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+      />
     </div>
-  );
+  )
 }

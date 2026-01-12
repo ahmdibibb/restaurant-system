@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, MapPin, ShoppingCart } from 'lucide-react'
+import { LogOut, ShoppingCart, User } from 'lucide-react'
 
 interface CartItem {
   productId: string
@@ -18,96 +18,23 @@ interface NavbarProps {
   sticky?: boolean
 }
 
-export default function Navbar({ 
-  title, 
-  showCart = false, 
-  cart = [], 
+export default function Navbar({
+  title,
+  showCart = false,
+  cart = [],
   cartHref = '/cart',
-  sticky = false 
+  sticky = false
 }: NavbarProps) {
   const router = useRouter()
-  
-  const [location, setLocation] = useState<string>('Mendapatkan lokasi...')
 
-  useEffect(() => {
-    // Get location
-    const getLocation = async () => {
-      try {
-        if (typeof window !== 'undefined' && navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              const { latitude, longitude } = position.coords
-              try {
-                const response = await fetch(
-                  `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=id`,
-                  {
-                    method: 'GET',
-                    headers: {
-                      'Accept': 'application/json',
-                    },
-                  }
-                )
-                
-                if (!response.ok) {
-                  throw new Error('Failed to fetch location')
-                }
-                
-                const data = await response.json()
-                
-                if (data.city || data.locality) {
-                  const cityName = data.city || data.locality || data.principalSubdivision || ''
-                  const countryName = data.countryName || 'Indonesia'
-                  setLocation(`${cityName}, ${countryName}`)
-                } else if (data.principalSubdivision) {
-                  setLocation(`${data.principalSubdivision}, ${data.countryName || 'Indonesia'}`)
-                } else {
-                  setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
-                }
-              } catch (error) {
-                console.error('Error fetching location name:', error)
-                setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
-              }
-            },
-            (error) => {
-              console.error('Geolocation error:', error)
-              const PERMISSION_DENIED = 1
-              const POSITION_UNAVAILABLE = 2
-              const TIMEOUT = 3
-              
-              if (error.code === PERMISSION_DENIED) {
-                setLocation('Izin lokasi ditolak')
-              } else if (error.code === POSITION_UNAVAILABLE) {
-                setLocation('Lokasi tidak tersedia')
-              } else if (error.code === TIMEOUT) {
-                setLocation('Timeout mendapatkan lokasi')
-              } else {
-                setLocation('Lokasi tidak dapat diakses')
-              }
-            },
-            {
-              enableHighAccuracy: false,
-              timeout: 10000,
-              maximumAge: 300000,
-            }
-          )
-        } else {
-          setLocation('Geolocation tidak didukung')
-        }
-      } catch (error) {
-        console.error('Error in getLocation:', error)
-        setLocation('Error mendapatkan lokasi')
-      }
-    }
 
-    getLocation()
-  }, [])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
   }
 
-  const navClassName = sticky 
+  const navClassName = sticky
     ? "sticky top-0 z-50 bg-white shadow-md"
     : "bg-white shadow-sm"
 
@@ -117,13 +44,7 @@ export default function Navbar({
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <h1 className="text-2xl font-bold text-orange-600">{title}</h1>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-            {/* Location */}
-            <div className="flex items-center gap-2 text-xs md:text-sm text-gray-700">
-              <MapPin size={18} className="text-orange-600 flex-shrink-0" />
-              <span className="font-medium break-words min-w-0">
-                {location || 'Memuat lokasi...'}
-              </span>
-            </div>
+
 
             {/* Cart Button (if showCart is true) */}
             {showCart && (
@@ -140,6 +61,15 @@ export default function Navbar({
                 )}
               </Link>
             )}
+
+            {/* Profile Button */}
+            <Link
+              href="/profile"
+              className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 transition-all hover:bg-gray-50 hover:scale-105 active:scale-95 w-full md:w-auto"
+            >
+              <User size={20} />
+              Profile
+            </Link>
 
             {/* Logout Button */}
             <button
