@@ -56,9 +56,9 @@ export async function GET(request: NextRequest) {
       })),
       payment: order.payment
         ? {
-            ...order.payment,
-            amount: order.payment.amount.toNumber(),
-          }
+          ...order.payment,
+          amount: order.payment.amount.toNumber(),
+        }
         : null,
     }))
 
@@ -83,15 +83,31 @@ export async function POST(request: NextRequest) {
 
     const user = await getCurrentUser(token)
 
-    if (!user || user.role !== 'USER') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { items } = await request.json()
+    const { items, orderType, tableNumber, notes } = await request.json()
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: 'Items are required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate orderType
+    if (!orderType || !['DINE_IN', 'TAKEAWAY'].includes(orderType)) {
+      return NextResponse.json(
+        { error: 'Order type harus Dine-in atau Takeaway' },
+        { status: 400 }
+      )
+    }
+
+    // Validate tableNumber for DINE_IN
+    if (orderType === 'DINE_IN' && (!tableNumber || !tableNumber.trim())) {
+      return NextResponse.json(
+        { error: 'Nomor meja wajib diisi untuk Dine-in' },
         { status: 400 }
       )
     }
@@ -140,6 +156,9 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         totalAmount: new Prisma.Decimal(totalAmount),
         status: 'PENDING',
+        orderType: orderType as 'DINE_IN' | 'TAKEAWAY',
+        tableNumber: orderType === 'DINE_IN' ? tableNumber : null,
+        notes: notes || null,
         items: {
           create: orderItems.map((item) => ({
             productId: item.productId,

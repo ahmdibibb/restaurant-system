@@ -94,11 +94,15 @@ export default function ReceiptPage() {
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-4 flex justify-between print:hidden">
           <button
-            onClick={() => router.push('/products')}
+            onClick={() => {
+              // Clear cart before going back to products
+              localStorage.removeItem('cart')
+              router.push('/products')
+            }}
             className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
           >
             <Home size={20} />
-            Back to Home
+            Pesanan Baru
           </button>
           <button
             onClick={handlePrint}
@@ -125,6 +129,24 @@ export default function ReceiptPage() {
               <p className="text-sm text-gray-600">Date & Time</p>
               <p className="text-lg">{formatDate(order.createdAt)}</p>
             </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">Order Type</p>
+              <p className="text-lg font-semibold">
+                {(order as any).orderType === 'DINE_IN' ? 'Dine-in' : 'Takeaway'}
+              </p>
+            </div>
+            {(order as any).orderType === 'DINE_IN' && (order as any).tableNumber && (
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">Table Number</p>
+                <p className="text-lg font-semibold">{(order as any).tableNumber}</p>
+              </div>
+            )}
+            {(order as any).notes && (
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">Special Notes</p>
+                <p className="text-lg">{(order as any).notes}</p>
+              </div>
+            )}
           </div>
 
           <div className="mb-6">

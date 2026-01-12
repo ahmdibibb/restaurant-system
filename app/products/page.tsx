@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/navbar/Navbar";
 import CategoryNavbar from "@/components/navbar/CategoryNavbar";
 import ProductCard from "@/components/ProductCard";
+import CartSidebar from "@/components/CartSidebar";
 import Loading from "@/components/Loading";
 
 interface Product {
@@ -27,6 +29,7 @@ interface CartItem {
 type Category = "ALL" | "MAKANAN" | "MINUMAN";
 
 export default function ProductsPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -67,13 +70,10 @@ export default function ProductsPage() {
   // Get placeholder image based on category
   const getPlaceholderImage = (category: string | null, name: string) => {
     if (category?.toUpperCase() === "MAKANAN") {
-      // Food images from Unsplash - BBQ/Grilled food
       return `https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=300&fit=crop&q=80`;
     } else if (category?.toUpperCase() === "MINUMAN") {
-      // Drink images from Unsplash
       return `https://images.unsplash.com/photo-1546171753-97d7676e4602?w=400&h=300&fit=crop&q=80`;
     }
-    // Default food image - BBQ ribs
     return `https://images.unsplash.com/photo-1528607929212-2636ec44253e?w=400&h=300&fit=crop&q=80`;
   };
 
@@ -91,7 +91,7 @@ export default function ProductsPage() {
 
   const addToCart = (product: Product) => {
     if (product.stock <= 0) {
-      alert("Product out of stock");
+      alert("Produk habis");
       return;
     }
 
@@ -100,7 +100,7 @@ export default function ProductsPage() {
 
     if (existingItem) {
       if (existingItem.quantity >= product.stock) {
-        alert("Insufficient stock");
+        alert("Stok tidak cukup");
         return;
       }
       newCart = cart.map((item) =>
@@ -136,7 +136,7 @@ export default function ProductsPage() {
 
     const product = products.find((p) => p.id === productId);
     if (product && quantity > product.stock) {
-      alert("Insufficient stock");
+      alert("Stok tidak cukup");
       return;
     }
 
@@ -146,19 +146,23 @@ export default function ProductsPage() {
     saveCart(newCart);
   };
 
-  const getTotalPrice = () => {
-    return cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  const handleCheckout = () => {
+    if (cart.length === 0) {
+      alert("Keranjang masih kosong");
+      return;
+    }
+    router.push("/checkout");
   };
 
   if (loading) {
-    return <Loading message="Loading menu..." />;
+    return <Loading message="Memuat menu..." />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar
         title="Resto Iga Bakar"
-        showCart={true}
+        showCart={false}
         cart={cart}
         sticky={true}
       />
@@ -167,34 +171,65 @@ export default function ProductsPage() {
         onCategoryChange={setSelectedCategory}
       />
 
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <h2 className="mb-6 text-3xl font-bold text-gray-800">
-          {selectedCategory === "ALL"
-            ? "Semua Menu"
-            : selectedCategory === "MAKANAN"
-            ? "Makanan"
-            : "Minuman"}
-        </h2>
+      {/* Main Content - 2 Column Layout */}
+      <div className="flex">
+        {/* Left Side - Cart Sidebar (Desktop) */}
+        <div className="hidden lg:block lg:w-96 flex-shrink-0">
+          <CartSidebar
+            cart={cart}
+            onUpdateQuantity={updateQuantity}
+            onRemoveItem={removeFromCart}
+            onCheckout={handleCheckout}
+          />
+        </div>
 
-        {filteredProducts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-lg text-gray-500">
-              Tidak ada produk tersedia untuk kategori ini
-            </p>
+        {/* Right Side - Products Grid */}
+        <div className="flex-1 px-4 py-8 lg:px-8 lg:ml-0">
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-800 lg:text-3xl">
+                {selectedCategory === "ALL"
+                  ? "Semua Menu"
+                  : selectedCategory === "MAKANAN"
+                    ? "Makanan"
+                    : "Minuman"}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {filteredProducts.length} produk
+              </p>
+            </div>
+
+            {filteredProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-gray-500">
+                  Tidak ada produk tersedia untuk kategori ini
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {filteredProducts.map((product, index) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    index={index}
+                    onAddToCart={addToCart}
+                    getPlaceholderImage={getPlaceholderImage}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProducts.map((product, index) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                index={index}
-                onAddToCart={addToCart}
-                getPlaceholderImage={getPlaceholderImage}
-              />
-            ))}
-          </div>
-        )}
+        </div>
+
+        {/* Mobile Cart Sidebar */}
+        <div className="lg:hidden">
+          <CartSidebar
+            cart={cart}
+            onUpdateQuantity={updateQuantity}
+            onRemoveItem={removeFromCart}
+            onCheckout={handleCheckout}
+          />
+        </div>
       </div>
     </div>
   );

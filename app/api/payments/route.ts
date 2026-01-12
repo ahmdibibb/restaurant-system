@@ -14,8 +14,8 @@ export async function POST(request: NextRequest) {
 
     const user = await getCurrentUser(token)
 
-    if (!user || user.role !== 'USER') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { orderId, method } = await request.json()
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       code: error.code,
       meta: error.meta,
     })
-    
+
     // Return error with more details in development
     let errorMessage = 'Internal server error'
     if (process.env.NODE_ENV === 'development') {
@@ -139,17 +139,17 @@ export async function POST(request: NextRequest) {
         errorMessage += ` (Code: ${error.code})`
       }
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: errorMessage,
-        details: process.env.NODE_ENV === 'development' 
+        details: process.env.NODE_ENV === 'development'
           ? {
-              message: error.message,
-              code: error.code,
-              stack: error.stack,
-              meta: error.meta,
-            }
+            message: error.message,
+            code: error.code,
+            stack: error.stack,
+            meta: error.meta,
+          }
           : undefined
       },
       { status: 500 }

@@ -1,25 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyPassword, signToken } from '@/lib/auth'
+import { validateLoginData } from '@/lib/validation'
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
 
+    // Validate all fields are present
     if (!email || !password) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'Email dan password harus diisi' },
+        { status: 400 }
+      )
+    }
+
+    // Validate data format
+    const validation = validateLoginData({ email, password })
+
+    if (!validation.isValid) {
+      const errorMessages: string[] = []
+
+      if (validation.errors.email) {
+        errorMessages.push(...validation.errors.email)
+      }
+      if (validation.errors.password) {
+        errorMessages.push(...validation.errors.password)
+      }
+
+      return NextResponse.json(
+        {
+          error: errorMessages.join(', '),
+          validationErrors: validation.errors
+        },
         { status: 400 }
       )
     }
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
     })
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: 'Email atau password salah' },
         { status: 401 }
       )
     }
@@ -28,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     if (!isValid) {
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: 'Email atau password salah' },
         { status: 401 }
       )
     }
@@ -59,7 +83,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Terjadi kesalahan server. Silakan coba lagi.' },
       { status: 500 }
     )
   }

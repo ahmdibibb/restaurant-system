@@ -105,10 +105,12 @@ export default function AdminDashboard() {
         return;
       }
 
-      // User is admin, fetch data
-      fetchStats();
-      fetchProducts();
-      fetchSalesReport();
+      // User is admin, fetch data in parallel for faster loading
+      await Promise.all([
+        fetchStats(),
+        fetchProducts(),
+      ]);
+      // Don't fetch sales report initially, only when user clicks
     } catch (error) {
       console.error("Error checking user role:", error);
       router.push("/login");
@@ -236,6 +238,7 @@ export default function AdminDashboard() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           ...formData,
           price: parseFloat(formData.price),
@@ -255,9 +258,14 @@ export default function AdminDashboard() {
           category: "",
         });
         fetchProducts();
+        setError(null); // Clear any previous errors
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to save product');
       }
     } catch (error) {
       console.error("Error saving product:", error);
+      setError('Network error. Please try again.');
     }
   };
 
@@ -493,10 +501,10 @@ export default function AdminDashboard() {
                       <p className="text-xs text-gray-500">
                         {salesReport.totalRevenue > 0
                           ? (
-                              (salesReport.revenueByMethod.CASH /
-                                salesReport.totalRevenue) *
-                              100
-                            ).toFixed(1)
+                            (salesReport.revenueByMethod.CASH /
+                              salesReport.totalRevenue) *
+                            100
+                          ).toFixed(1)
                           : 0}
                         % dari total
                       </p>
@@ -518,10 +526,10 @@ export default function AdminDashboard() {
                       <p className="text-xs text-gray-500">
                         {salesReport.totalRevenue > 0
                           ? (
-                              (salesReport.revenueByMethod.QRIS /
-                                salesReport.totalRevenue) *
-                              100
-                            ).toFixed(1)
+                            (salesReport.revenueByMethod.QRIS /
+                              salesReport.totalRevenue) *
+                            100
+                          ).toFixed(1)
                           : 0}
                         % dari total
                       </p>
@@ -543,10 +551,10 @@ export default function AdminDashboard() {
                       <p className="text-xs text-gray-500">
                         {salesReport.totalRevenue > 0
                           ? (
-                              (salesReport.revenueByMethod.EDC /
-                                salesReport.totalRevenue) *
-                              100
-                            ).toFixed(1)
+                            (salesReport.revenueByMethod.EDC /
+                              salesReport.totalRevenue) *
+                            100
+                          ).toFixed(1)
                           : 0}
                         % dari total
                       </p>
@@ -802,11 +810,10 @@ export default function AdminDashboard() {
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <span
-                      className={`rounded-full px-2 py-1 text-xs ${
-                        product.isActive
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
+                      className={`rounded-full px-2 py-1 text-xs ${product.isActive
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                        }`}
                     >
                       {product.isActive ? "Active" : "Inactive"}
                     </span>
