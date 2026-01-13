@@ -19,12 +19,12 @@ export default function LoginPage() {
 
     // Basic validation
     if (!email.trim()) {
-      setError('Email dan password tidak boleh kosong')
+      setError('Email dan Password tidak boleh kosong')
       return
     }
 
     if (!password) {
-      setError('Email dan password tidak boleh kosong')
+      setError('Email dan Password tidak boleh kosong')
       return
     }
 
