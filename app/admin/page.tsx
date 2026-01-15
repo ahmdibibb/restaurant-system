@@ -323,32 +323,34 @@ export default function AdminDashboard() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <div className="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 flex flex-col py-6 z-50">
+      <div className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-white to-gray-50/50 border-r border-gray-200/80 flex flex-col py-6 z-50 shadow-xl">
         {/* Logo */}
         <div className="px-6 mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-600 rounded-xl flex items-center justify-center">
-              <span className="text-xl"></span>
+            <div className="w-11 h-11 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200 transform transition-transform hover:scale-105">
+              <span className="text-xl">🔥</span>
             </div>
-            <span className="text-xl font-bold text-gray-900">Resto Iga Bakar</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Resto Iga Bakar</span>
           </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 px-4">
-          <div className="space-y-1">
+          <div className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
-                    ? 'bg-orange-50 text-orange-600 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 group ${activeTab === item.id
+                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold shadow-lg shadow-orange-200 scale-[1.02]'
+                    : 'text-gray-600 hover:bg-white hover:text-gray-900 hover:shadow-md hover:scale-[1.01]'
                     }`}
                 >
-                  <Icon size={20} />
+                  <div className={`${activeTab === item.id ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-orange-100'} p-1.5 rounded-lg transition-colors`}>
+                    <Icon size={18} className={activeTab === item.id ? 'text-white' : 'text-gray-700 group-hover:text-orange-600'} />
+                  </div>
                   <span className="text-sm">{item.label}</span>
                 </button>
               )
@@ -357,9 +359,11 @@ export default function AdminDashboard() {
         </nav>
 
         {/* Settings & Logout */}
-        <div className="px-4 space-y-1 border-t border-gray-200 pt-4">
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all">
-            <Settings size={20} />
+        <div className="px-4 space-y-2 border-t border-gradient-to-r from-transparent via-gray-200 to-transparent pt-4 mt-4">
+          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-gray-600 hover:bg-white hover:text-gray-900 hover:shadow-md transition-all duration-200 group">
+            <div className="bg-gray-100 group-hover:bg-blue-100 p-1.5 rounded-lg transition-colors">
+              <Settings size={18} className="group-hover:text-blue-600 transition-colors" />
+            </div>
             <span className="text-sm">Settings</span>
           </button>
           <button
@@ -367,10 +371,12 @@ export default function AdminDashboard() {
               document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
               router.push('/login')
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:shadow-md transition-all duration-200 group"
           >
-            <LogOut size={20} />
-            <span className="text-sm">Sign Out</span>
+            <div className="bg-red-50 group-hover:bg-red-100 p-1.5 rounded-lg transition-colors">
+              <LogOut size={18} className="group-hover:scale-110 transition-transform" />
+            </div>
+            <span className="text-sm font-medium">Sign Out</span>
           </button>
         </div>
       </div>
@@ -378,25 +384,25 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 ml-64">
         {/* Top Bar */}
-        <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-8 py-4">
+        <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-200/80 px-8 py-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                 {navItems.find((item) => item.id === activeTab)?.label || 'Dashboard'}
               </h1>
             </div>
 
-            <div className="flex items-center gap-4">
-              <button className="p-2 rounded-lg hover:bg-gray-100">
-                <Moon size={20} className="text-gray-600" />
+            <div className="flex items-center gap-3">
+              <button className="p-2.5 rounded-xl hover:bg-gray-100 transition-all duration-200 hover:shadow-md group">
+                <Moon size={20} className="text-gray-600 group-hover:text-gray-900 transition-colors" />
               </button>
-              <button className="p-2 rounded-lg hover:bg-gray-100 relative">
-                <Bell size={20} className="text-gray-600" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              <button className="p-2.5 rounded-xl hover:bg-gray-100 transition-all duration-200 hover:shadow-md relative group">
+                <Bell size={20} className="text-gray-600 group-hover:text-gray-900 transition-colors" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse ring-2 ring-white"></span>
               </button>
-              <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
-                <span className="text-sm font-medium text-gray-700">Admin</span>
-                <div className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center">
+              <div className="flex items-center gap-3 pl-4 ml-2 border-l border-gray-200">
+                <span className="text-sm font-semibold text-gray-700">Admin</span>
+                <div className="w-10 h-10 bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl flex items-center justify-center shadow-lg ring-2 ring-gray-200 hover:ring-orange-300 transition-all duration-200 cursor-pointer hover:scale-105">
                   <User size={20} className="text-white" />
                 </div>
               </div>
