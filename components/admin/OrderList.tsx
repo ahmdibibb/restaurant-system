@@ -10,15 +10,20 @@ interface Order {
     totalAmount: number
     status: string
     orderType: string
+    tableNumber?: string
     createdAt: string
     user: {
         name: string
         email: string
     }
     items: Array<{
+        id: string
         quantity: number
+        price: number
+        subtotal: number
         product: {
             name: string
+            category: string
         }
     }>
 }
