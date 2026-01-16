@@ -90,6 +90,7 @@ export default function AdminDashboard() {
   const [revenuePeriod, setRevenuePeriod] = useState('monthly')
   const [orderPeriod, setOrderPeriod] = useState('weekly')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -104,11 +105,24 @@ export default function AdminDashboard() {
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'dashboard') {
+    // Only fetch dashboard data after authentication and when on dashboard tab
+    if (isAuthenticated && activeTab === 'dashboard') {
+      // Initial fetch
       fetchTodayStats()
       fetchRecentOrders()
+      fetchStats()
+
+      // Set up polling to refresh data every 5 seconds
+      const interval = setInterval(() => {
+        fetchTodayStats()
+        fetchRecentOrders()
+        fetchStats()
+      }, 5000) // Refresh every 5 seconds
+
+      // Cleanup interval when component unmounts or dependencies change
+      return () => clearInterval(interval)
     }
-  }, [activeTab])
+  }, [activeTab, isAuthenticated])
 
   const checkUserRole = async () => {
     try {
@@ -125,14 +139,20 @@ export default function AdminDashboard() {
       if (data.user?.role !== 'ADMIN') {
         setError('Access denied. Admin privileges required.')
         setLoading(false)
+        setIsAuthenticated(false)
         return
       }
+
+      // Clear any previous errors and mark as authenticated
+      setError(null)
+      setIsAuthenticated(true)
 
       await Promise.all([fetchStats(), fetchProducts()])
       setLoading(false)
     } catch (error) {
       console.error('Error checking user role:', error)
       setLoading(false)
+      setIsAuthenticated(false)
       router.push('/login')
     }
   }
@@ -148,9 +168,12 @@ export default function AdminDashboard() {
         const data = await res.json()
         setTodayOrders(data.stats?.totalOrders || 0)
         setTodayRevenue(data.stats?.totalRevenue || 0)
+        // Clear error on successful fetch
+        setError(null)
       }
+      // Silently handle errors - don't spam console during polling
     } catch (error) {
-      console.error('Error fetching today stats:', error)
+      // Silently handle errors - don't spam console during polling
     }
   }
 
@@ -163,9 +186,12 @@ export default function AdminDashboard() {
       if (res.ok) {
         const data = await res.json()
         setRecentOrders(data.orders || [])
+        // Clear error on successful fetch
+        setError(null)
       }
+      // Silently handle errors - don't spam console during polling
     } catch (error) {
-      console.error('Error fetching recent orders:', error)
+      // Silently handle errors - don't spam console during polling
     }
   }
 
@@ -196,8 +222,10 @@ export default function AdminDashboard() {
         topProducts: data.topProducts || [],
         dailySales: data.dailySales || [],
       })
+      // Clear error on successful fetch
+      setError(null)
     } catch (error) {
-      console.error('Error fetching stats:', error)
+      // Silently handle errors - don't spam console during polling
       setStats({
         totalSales: 0,
         totalOrders: 0,
@@ -214,8 +242,10 @@ export default function AdminDashboard() {
       const res = await fetch('/api/products')
       const data = await res.json()
       setProducts(data)
+      // Clear error on successful fetch
+      setError(null)
     } catch (error) {
-      console.error('Error fetching products:', error)
+      // Silently handle errors - don't spam console during polling
     } finally {
       setLoading(false)
     }
@@ -424,164 +454,138 @@ export default function AdminDashboard() {
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {/* Total Menus */}
-                <div className="bg-gray-900 text-white rounded-2xl p-6">
-                  <div className="flex items-start justify-between mb-4">
+                <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-4xl font-bold">{products.length}</p>
-                      <p className="text-sm text-gray-400 mt-1">Total Menus</p>
+                      <p className="text-4xl font-bold text-gray-900">{products.length}</p>
+                      <p className="text-sm text-gray-500 mt-1">Total Menus</p>
                     </div>
-                    <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center">
-                      <Package size={20} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">0</span>
-                      <span className="text-gray-400">{products.length}</span>
-                    </div>
-                    <div className="w-full bg-gray-800 rounded-full h-2">
-                      <div className="bg-white rounded-full h-2" style={{ width: '100%' }}></div>
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <Package size={20} className="text-gray-900" />
                     </div>
                   </div>
                 </div>
 
                 {/* Total Orders Today */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-200">
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start justify-between">
                     <div>
                       <p className="text-4xl font-bold text-gray-900">{todayOrders}</p>
                       <p className="text-sm text-gray-500 mt-1">Total Orders Today</p>
                     </div>
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <ShoppingCart size={20} className="text-purple-600" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">0</span>
-                      <span className="text-gray-400">{todayOrders}</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-purple-400 rounded-full h-2"
-                        style={{ width: todayOrders > 0 ? `${Math.min((todayOrders / 20) * 100, 100)}%` : '0%' }}
-                      ></div>
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <ShoppingCart size={20} className="text-gray-900" />
                     </div>
                   </div>
                 </div>
 
                 {/* Total Products Sold */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-200">
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start justify-between">
                     <div>
                       <p className="text-4xl font-bold text-gray-900">{stats?.productsSold || 0}</p>
                       <p className="text-sm text-gray-500 mt-1">Total Products Sold</p>
                     </div>
                     <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Package size={20} className="text-gray-600" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">0</span>
-                      <span className="text-gray-400">{stats?.productsSold || 0}</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-gray-300 rounded-full h-2"
-                        style={{ width: stats?.productsSold ? `${Math.min((stats.productsSold / 100) * 100, 100)}%` : '0%' }}
-                      ></div>
+                      <Package size={20} className="text-gray-900" />
                     </div>
                   </div>
                 </div>
 
                 {/* Revenue Today */}
                 <div className="bg-white rounded-2xl p-6 border border-gray-200">
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start justify-between">
                     <div>
                       <p className="text-4xl font-bold text-gray-900">
                         Rp {todayRevenue.toLocaleString('id-ID')}
                       </p>
                       <p className="text-sm text-gray-500 mt-1">Revenue Today</p>
                     </div>
-                    <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
-                      <DollarSign size={20} className="text-pink-600" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Rp 0</span>
-                      <span className="text-gray-400">Rp {todayRevenue.toLocaleString('id-ID')}</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className="bg-pink-400 rounded-full h-2"
-                        style={{ width: todayRevenue > 0 ? `${Math.min((todayRevenue / 1000000) * 100, 100)}%` : '0%' }}
-                      ></div>
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <DollarSign size={20} className="text-gray-900" />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Charts Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Revenue Chart - Line Chart */}
-                <div className="bg-white rounded-2xl p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">Revenue</h3>
-                    <div className="flex gap-2">
+              {/* Revenue Chart */}
+              <div className="grid grid-cols-1 gap-6">
+                {/* Revenue Chart - Modern Design */}
+                <div className="bg-white rounded-2xl p-8 border border-gray-200">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-2xl font-semibold text-gray-900">Monthly Revenue</h3>
+                      <button className="w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center text-gray-400 hover:border-gray-600 hover:text-gray-600 transition-colors">
+                        <span className="text-sm font-bold">i</span>
+                      </button>
+                    </div>
+                    <div className="flex gap-1 bg-gray-50 rounded-xl p-1 border border-gray-200">
                       <button
-                        onClick={() => setRevenuePeriod('monthly')}
-                        className={`px-4 py-1 text-sm rounded-lg ${revenuePeriod === 'monthly'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-500 hover:bg-gray-100'
+                        onClick={() => setRevenuePeriod('today')}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${revenuePeriod === 'today'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
                           }`}
                       >
-                        Monthly
+                        Day
                       </button>
                       <button
                         onClick={() => setRevenuePeriod('weekly')}
-                        className={`px-4 py-1 text-sm rounded-lg ${revenuePeriod === 'weekly'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-500 hover:bg-gray-100'
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${revenuePeriod === 'weekly'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
                           }`}
                       >
-                        Weekly
+                        Week
                       </button>
                       <button
-                        onClick={() => setRevenuePeriod('today')}
-                        className={`px-4 py-1 text-sm rounded-lg ${revenuePeriod === 'today'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-500 hover:bg-gray-100'
+                        onClick={() => setRevenuePeriod('monthly')}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${revenuePeriod === 'monthly'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
                           }`}
                       >
-                        Today
+                        Month
+                      </button>
+                      <button
+                        className="px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 transition-all duration-200"
+                      >
+                        Year
+                      </button>
+                      <button
+                        className="px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:text-gray-900 transition-all duration-200"
+                      >
+                        Date Range
                       </button>
                     </div>
                   </div>
-                  <div className="h-64 relative">
+                  <div className="h-96 relative">
                     {stats?.dailySales && stats.dailySales.length > 0 ? (
                       <div className="h-full w-full relative">
                         {/* Y-axis labels */}
-                        <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-gray-400">
-                          <span>Rp {Math.max(...stats.dailySales.map(d => d.amount)).toLocaleString('id-ID', { notation: 'compact' })}</span>
-                          <span>Rp {(Math.max(...stats.dailySales.map(d => d.amount)) / 2).toLocaleString('id-ID', { notation: 'compact' })}</span>
-                          <span>0</span>
+                        <div className="absolute left-0 top-0 bottom-12 flex flex-col justify-between text-xs font-medium text-gray-400">
+                          <span>{(Math.max(...stats.dailySales.map(d => d.amount)) / 1000).toFixed(0)}k</span>
+                          <span>{(Math.max(...stats.dailySales.map(d => d.amount)) * 0.75 / 1000).toFixed(0)}k</span>
+                          <span>{(Math.max(...stats.dailySales.map(d => d.amount)) / 2 / 1000).toFixed(0)}k</span>
+                          <span>{(Math.max(...stats.dailySales.map(d => d.amount)) * 0.25 / 1000).toFixed(0)}k</span>
+                          <span>0k</span>
                         </div>
 
                         {/* Chart area */}
-                        <div className="ml-12 h-full pb-8 relative">
-                          <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
-                            {/* Grid lines */}
-                            <line x1="0" y1="0" x2="400" y2="0" stroke="#e5e7eb" strokeWidth="1" />
-                            <line x1="0" y1="100" x2="400" y2="100" stroke="#e5e7eb" strokeWidth="1" />
-                            <line x1="0" y1="200" x2="400" y2="200" stroke="#e5e7eb" strokeWidth="1" />
+                        <div className="ml-12 h-full pb-12 relative group">
+                          <svg className="w-full h-full" viewBox="0 0 600 300" preserveAspectRatio="none">
+                            {/* Grid lines - horizontal dotted */}
+                            <line x1="0" y1="0" x2="600" y2="0" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3 3" />
+                            <line x1="0" y1="75" x2="600" y2="75" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3 3" />
+                            <line x1="0" y1="150" x2="600" y2="150" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3 3" />
+                            <line x1="0" y1="225" x2="600" y2="225" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3 3" />
+                            <line x1="0" y1="300" x2="600" y2="300" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="3 3" />
 
-                            {/* Area fill */}
+                            {/* Area fill with cyan gradient */}
                             <defs>
-                              <linearGradient id="revenueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-                                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+                              <linearGradient id="cyanGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.3" />
+                                <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.05" />
                               </linearGradient>
                             </defs>
 
@@ -590,56 +594,59 @@ export default function AdminDashboard() {
                               const data = stats.dailySales.slice(-dataCount)
                               const maxAmount = Math.max(...data.map(d => d.amount), 1)
                               const points = data.map((day, i) => {
-                                const x = data.length > 1 ? (i / (data.length - 1)) * 400 : 200
-                                const y = 200 - (day.amount / maxAmount) * 200
-                                return `${x},${y}`
-                              }).join(' ')
+                                const x = data.length > 1 ? (i / (data.length - 1)) * 600 : 300
+                                const y = 300 - (day.amount / maxAmount) * 280 - 10
+                                return { x, y, amount: day.amount, date: day.date }
+                              })
 
-                              const areaPoints = `0,200 ${points} 400,200`
+                              const linePoints = points.map(p => `${p.x},${p.y}`).join(' ')
+                              const areaPoints = `0,300 ${linePoints} 600,300`
 
                               return (
                                 <>
+                                  {/* Area fill */}
                                   <polyline
                                     points={areaPoints}
-                                    fill="url(#revenueGradient)"
+                                    fill="url(#cyanGradient)"
                                   />
+                                  {/* Line */}
                                   <polyline
-                                    points={points}
+                                    points={linePoints}
                                     fill="none"
-                                    stroke="#3b82f6"
+                                    stroke="#0e7490"
                                     strokeWidth="3"
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                   />
-                                  {data.map((day, i) => {
-                                    const x = data.length > 1 ? (i / (data.length - 1)) * 400 : 200
-                                    const y = 200 - (day.amount / maxAmount) * 200
-                                    return (
+                                  {/* Data points */}
+                                  {points.map((point, i) => (
+                                    <g key={i}>
                                       <circle
-                                        key={i}
-                                        cx={x}
-                                        cy={y}
-                                        r="4"
-                                        fill="#3b82f6"
-                                        className="hover:r-6 transition-all cursor-pointer"
+                                        cx={point.x}
+                                        cy={point.y}
+                                        r="5"
+                                        fill="#0e7490"
+                                        className="transition-all cursor-pointer hover:r-7"
                                       />
-                                    )
-                                  })}
+                                    </g>
+                                  ))}
                                 </>
                               )
                             })()}
                           </svg>
 
                           {/* X-axis labels */}
-                          <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-400">
+                          <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs font-medium text-gray-400">
                             {(() => {
                               const dataCount = revenuePeriod === 'monthly' ? 30 : revenuePeriod === 'weekly' ? 7 : 1
                               const data = stats.dailySales.slice(-dataCount)
-                              return data.map((day, i) => (
-                                <span key={i}>
+                              // Show labels every few days for monthly view
+                              const step = revenuePeriod === 'monthly' ? 2 : 1
+                              return data.filter((_, i) => i % step === 0 || i === data.length - 1).map((day, i) => (
+                                <span key={i} className="text-center">
                                   {revenuePeriod === 'today'
                                     ? new Date(day.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-                                    : new Date(day.date).getDate()
+                                    : new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                                   }
                                 </span>
                               ))
@@ -648,140 +655,12 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     ) : (
-                      <div className="h-full flex items-center justify-center text-gray-400">
-                        No revenue data available
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Order Summary Chart - Line Chart */}
-                <div className="bg-white rounded-2xl p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">Order Summary</h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setOrderPeriod('monthly')}
-                        className={`px-4 py-1 text-sm rounded-lg ${orderPeriod === 'monthly'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-500 hover:bg-gray-100'
-                          }`}
-                      >
-                        Monthly
-                      </button>
-                      <button
-                        onClick={() => setOrderPeriod('weekly')}
-                        className={`px-4 py-1 text-sm rounded-lg ${orderPeriod === 'weekly'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-500 hover:bg-gray-100'
-                          }`}
-                      >
-                        Weekly
-                      </button>
-                      <button
-                        onClick={() => setOrderPeriod('today')}
-                        className={`px-4 py-1 text-sm rounded-lg ${orderPeriod === 'today'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-500 hover:bg-gray-100'
-                          }`}
-                      >
-                        Today
-                      </button>
-                    </div>
-                  </div>
-                  <div className="h-64 relative">
-                    {stats?.dailySales && stats.dailySales.length > 0 ? (
-                      <div className="h-full w-full relative">
-                        {/* Y-axis labels */}
-                        <div className="absolute left-0 top-0 bottom-8 flex flex-col justify-between text-xs text-gray-400">
-                          <span>{Math.max(...stats.dailySales.map(d => d.amount))}</span>
-                          <span>{Math.round(Math.max(...stats.dailySales.map(d => d.amount)) / 2)}</span>
-                          <span>0</span>
-                        </div>
-
-                        {/* Chart area */}
-                        <div className="ml-12 h-full pb-8 relative">
-                          <svg className="w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="none">
-                            {/* Grid lines */}
-                            <line x1="0" y1="0" x2="400" y2="0" stroke="#e5e7eb" strokeWidth="1" />
-                            <line x1="0" y1="100" x2="400" y2="100" stroke="#e5e7eb" strokeWidth="1" />
-                            <line x1="0" y1="200" x2="400" y2="200" stroke="#e5e7eb" strokeWidth="1" />
-
-                            {/* Area fill */}
-                            <defs>
-                              <linearGradient id="orderGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
-                                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.05" />
-                              </linearGradient>
-                            </defs>
-
-                            {(() => {
-                              const dataCount = orderPeriod === 'monthly' ? 30 : orderPeriod === 'weekly' ? 7 : 1
-                              const data = stats.dailySales.slice(-dataCount)
-                              const maxAmount = Math.max(...data.map(d => d.amount), 1)
-                              const points = data.map((day, i) => {
-                                const x = data.length > 1 ? (i / (data.length - 1)) * 400 : 200
-                                const y = 200 - (day.amount / maxAmount) * 200
-                                return `${x},${y}`
-                              }).join(' ')
-
-                              const areaPoints = `0,200 ${points} 400,200`
-
-                              return (
-                                <>
-                                  <polyline
-                                    points={areaPoints}
-                                    fill="url(#orderGradient)"
-                                  />
-                                  <polyline
-                                    points={points}
-                                    fill="none"
-                                    stroke="#8b5cf6"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                  {data.map((day, i) => {
-                                    const x = data.length > 1 ? (i / (data.length - 1)) * 400 : 200
-                                    const y = 200 - (day.amount / maxAmount) * 200
-                                    return (
-                                      <circle
-                                        key={i}
-                                        cx={x}
-                                        cy={y}
-                                        r="4"
-                                        fill="#8b5cf6"
-                                        className="hover:r-6 transition-all cursor-pointer"
-                                      />
-                                    )
-                                  })}
-                                </>
-                              )
-                            })()}
-                          </svg>
-
-                          {/* X-axis labels */}
-                          <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-400">
-                            {(() => {
-                              const dataCount = orderPeriod === 'monthly' ? 30 : orderPeriod === 'weekly' ? 7 : 1
-                              const data = stats.dailySales.slice(-dataCount)
-                              return data.map((day, i) => (
-                                <span key={i}>
-                                  {orderPeriod === 'today'
-                                    ? new Date(day.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-                                    : orderPeriod === 'weekly'
-                                      ? new Date(day.date).toLocaleDateString('id-ID', { weekday: 'short' })
-                                      : new Date(day.date).getDate()
-                                  }
-                                </span>
-                              ))
-                            })()}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-gray-400">
-                        No order data available
+                      <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                        <svg className="w-16 h-16 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <p className="font-medium">No revenue data available</p>
+                        <p className="text-sm mt-1">Start making sales to see your revenue chart</p>
                       </div>
                     )}
                   </div>
