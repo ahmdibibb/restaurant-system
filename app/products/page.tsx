@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ShoppingCart } from "lucide-react";
 import Navbar from "@/components/navbar/Navbar";
 import CategoryNavbar from "@/components/navbar/CategoryNavbar";
-import ProductCard from "@/components/ProductCard";
 import CartSidebar from "@/components/CartSidebar";
 import Loading from "@/components/Loading";
 
@@ -208,13 +208,65 @@ export default function ProductsPage() {
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {filteredProducts.map((product, index) => (
-                  <ProductCard
+                  <div
                     key={product.id}
-                    product={product}
-                    index={index}
-                    onAddToCart={addToCart}
-                    getPlaceholderImage={getPlaceholderImage}
-                  />
+                    className="group relative flex flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-gray-100"
+                    style={{
+                      animationDelay: `${index * 50}ms`,
+                    }}
+                  >
+                    {/* Product Image */}
+                    <div className="relative aspect-square overflow-hidden bg-gray-50">
+                      <img
+                        src={product.image || getPlaceholderImage(product.category, product.name)}
+                        alt={product.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      {product.stock <= 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                          <span className="rounded-full bg-red-500 px-4 py-2 text-sm font-bold text-white">
+                            Habis
+                          </span>
+                        </div>
+                      )}
+                      {product.stock > 0 && product.stock <= 5 && (
+                        <div className="absolute top-2 right-2">
+                          <span className="rounded-full bg-orange-500 px-2 py-1 text-xs font-semibold text-white shadow-md">
+                            Stok: {product.stock}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Product Info */}
+                    <div className="flex flex-col flex-1 p-3">
+                      <h3 className="mb-1 text-sm font-bold text-gray-900 line-clamp-2 min-h-[2.5rem]">
+                        {product.name}
+                      </h3>
+                      {product.description && (
+                        <p className="mb-3 text-xs text-gray-500 line-clamp-2 min-h-[2rem]">
+                          {product.description}
+                        </p>
+                      )}
+
+                      {/* Price */}
+                      <div className="mt-auto">
+                        <p className="mb-2 text-base font-bold text-orange-600 sm:text-lg">
+                          Rp {product.price.toLocaleString('id-ID')}
+                        </p>
+
+                        {/* Add to Cart Button */}
+                        <button
+                          onClick={() => addToCart(product)}
+                          disabled={product.stock <= 0}
+                          className="w-full flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-orange-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-orange-600"
+                        >
+                          <ShoppingCart size={18} />
+                          <span>Tambah</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
