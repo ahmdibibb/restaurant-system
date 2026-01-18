@@ -102,7 +102,7 @@ export default function ReceiptPage() {
             className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
           >
             <Home size={20} />
-            Pesanan Baru
+            Home Page
           </button>
           <button
             onClick={handlePrint}
